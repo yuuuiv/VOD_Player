@@ -7,18 +7,21 @@
 
     <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet" />
     <style>
-        body {
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
             background-color: #000;
+            overflow: hidden;
+        }
+        body {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
         }
         .video-js {
-            /* 设定播放器最大宽度，确保响应式 */
-            max-width: 90vw;
-            width: 100%;
+            width: 100vw;
+            height: 100vh;
         }
     </style>
 </head>
@@ -26,13 +29,13 @@
 
     <video
         id="vod-player"
-        class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid vjs-16-9"
+        class="video-js vjs-default-skin vjs-big-play-centered"
         controls
         preload="auto"
         width="1024"
         height="576"
         poster=""
-        
+        data-setup='{}'
     >
         <source
             src="https://vod.neofantasy.online/roselia/rose_250215/rose_250215.m3u8"
@@ -47,39 +50,72 @@
     <script src="https://vjs.zencdn.net/8.6.1/videojs-http-streaming.min.js"></script>
 
     <script>
-        // 4. 初始化 Video.js 播放器
+        // 初始化 Video.js 播放器并加入缓冲区优化配置
         var player = videojs('vod-player', {
-            // 默认配置
-            controls: true,
+            // 确保自动预加载
             preload: 'auto',
-            autoplay: false, // 建议关闭自动播放
+            // 自动播放
+            autoplay: false,
             
-            // HLS 性能优化配置
             html5: {
                 hls: {
-                    // 最大缓冲区长度（秒）
+                    // 【性能优化】设置最大缓冲区长度为 60 秒
                     maxBufferLength: 90, 
-                    // 最大下载缓冲区（字节），90MB
+                    // 【性能优化】设置最大下载缓冲区为 60MB，防止内存溢出
                     maxBufferSize: 90 * 1024 * 1024 
                 }
             }
         });
 
-        // 5. 监听播放器准备就绪事件
-        player.on('ready', function() {
-            console.log('Video player is ready.');
-            
-            // ⚠️ 如果您确实需要自动播放，请尝试静音自动播放，绕过浏览器限制
-            // player.muted(true); 
-            // player.play(); 
+        // 记忆播放进度
+        player.ready(function() {
+            var savedTime = localStorage.getItem('videoProgress');
+            if (savedTime) {
+                player.currentTime(parseFloat(savedTime));
+            }
+            player.on('timeupdate', function() {
+                localStorage.setItem('videoProgress', player.currentTime());
+            });
         });
-        
-        // 6. 监听错误事件，方便排查
-        player.on('error', function() {
-            var error = player.error();
-            if (error) {
-                console.error("Video.js 播放错误:", error.code, error.message, error.data);
-                alert("视频加载失败，请检查网络或源地址。");
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (player.paused()) {
+                    player.play();
+                } else {
+                    player.pause();
+                }
+            } else if (e.code === 'ArrowLeft') {
+                e.preventDefault();
+                player.currentTime(Math.max(0, player.currentTime() - 5));
+            } else if (e.code === 'ArrowRight') {
+                e.preventDefault();
+                player.currentTime(player.currentTime() + 5);
+            } else if (e.code === 'KeyS') {
+                e.preventDefault();
+                takeScreenshot();
+            }
+        });
+
+        // 触摸滑动支持（手机端）
+        var startX = 0;
+        var endX = 0;
+        document.addEventListener('touchstart', function(e) {
+            startX = e.touches[0].clientX;
+        });
+        document.addEventListener('touchend', function(e) {
+            endX = e.changedTouches[0].clientX;
+            var diff = startX - endX;
+            if (Math.abs(diff) > 50) { // 滑动阈值
+                if (diff > 0) {
+                    // 左滑，快退
+                    player.currentTime(Math.max(0, player.currentTime() - 5));
+                } else {
+                    // 右滑，快进
+                    player.currentTime(player.currentTime() + 5);
+                }
             }
         });
     </script>
